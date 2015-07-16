@@ -1,6 +1,5 @@
-# Code Name: culegatorul
+# Culegatorul
 Based on: [Sys::Statistic::Linux library](http://search.cpan.org/~bloonix/Sys-Statistics-Linux/lib/Sys/Statistics/Linux.pm)
-
 
 ## System related information: 
 
@@ -31,8 +30,8 @@ Roles are automatically detected.
 |sqlstat|Collect information about MySQL|
 |jabberstat|Collect information about EJabberd|
 |hubringstat|Collect information about Hubring|
-|esstat|Collect information about ElasitcSearch|
-|icstat|Collect information about Infrastructure controller HTTP service|
+|esstat|Collect information about ElasticSearch|
+|icstat|Collect information about Infrastructure Controller HTTP service|
 |httpstat|Collect information about HTTP service|
 |phpfpmstat|Collect information about php-fpm service|
 |worstat|Collect information about Celery|
@@ -42,7 +41,7 @@ Roles are automatically detected.
 
 In order to enable a certain stat set the options hash member value to 1. 
 
-```my %options = (
+	my %options = (
 	cpustats => 1,
 	memstats => 1,
 	diskstats => 1,
@@ -69,7 +68,7 @@ In order to enable a certain stat set the options hash member value to 1.
 	httpstat =>  0 || $role{'http'},
 	phpfpmstat => 0 || $role{'fpm'},
 	worstat =>  0 || $role{'wk'},
-);```
+	);
  
 
 Setting `$send_to_graphite = 1;` forces sending the results to Graphite. Make sure the `$graphite_host` variable contains the correct IP address of the server where Graphite is installed.
@@ -77,7 +76,7 @@ Setting `$send_to_graphite = 1;` forces sending the results to Graphite. Make su
 
 Aditionally needed packages available in the distribution repo:
 
-- perl-Time-HiRes 
+- perl-Time-HiRes
 - perl-libwww 
 - perl-JSON
 - perl-Crypt-SSLeay
