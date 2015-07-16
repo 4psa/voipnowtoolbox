@@ -96,7 +96,7 @@ class PKT(object):
   def __init__(self):
     print "Packet capture initialized."
   def __del__(self):
-    print "Packet captured terminated."
+    print "Packet capture terminated."
   def start(self):
     print "Starting packet capture - press CTRL+C after your call is finished."
     cmd_tcpdump = ['tcpdump', '-nni','any','-s','0', 'udp port 5050 or port 5060','-v','-w',log_path + ticket_id + '.pcap']
