@@ -2,7 +2,19 @@
 /**
  * 4PSA VoipNow - Script that detects if an email address is associated with
  * more then one user address any user; users are selected from sql.voipnow.client
- * The script generates a csv file with the information about the accounts with duplicate emails
+ * The script generates a csv file with the information about the accounts with
+ * duplicate emails (Customer ID, Name, Level, Company, Username, Email)
+ *
+ * To run the script you should use the next command:
+ *
+ *  $PHP_BIN --define register_argc_argv=On  --define open_basedir=${OPEN_BASEDIR} --define include_path=${INCLUDE_DIR}  -q ${SCRIPT_DIR}/detectduplicateemails.php
+ *
+ * where:
+ *       PHP_BIN = /usr/local/httpsa/php/bin/php
+ *      {OPEN_BASEDIR} = /usr/local/voipnow:/sbin:/tmp:/etc/voipnow:/etc/asterisk:/usr/local/hubphp:/usr/share/GeoIP
+ *      {INCLUDE_DIR} = /usr/local/voipnow/admin/htdocs:/usr/local/hubphp/libs/PEAR:/usr/local/hubphp:/usr/local/hubphp/libs
+ *      {SCRIPT_DIR} = /usr/local/voipnow/admin/htdocs
+ *
  *
  * Copyright (c) 2005-2015 Rack-Soft, Inc. All rights reserved.
  */
@@ -13,8 +25,10 @@ use HS\Product\Product;
 /**
  * Name of the CSV
  */
-const FILENAME = 'duplicate_emails.csv';
-const FILENAME_FULL_PATH = '/tmp/'.FILENAME;
+
+$DATE = date('Ymdhis', time());
+$FILENAME = 'duplicate_emails' . $DATE . '.csv';
+$FILENAME_FULL_PATH = '/tmp/' . $FILENAME;
 
 ob_start();
 
@@ -46,7 +60,7 @@ try {
     exit(90);
 }
 
-$sqlStatement = 'SELECT client.id, TRIM(CONCAT(first_name, " ", name)) as name, level, company, username,  email
+$sqlStatement = 'SELECT client.id, TRIM(name) as name, level, company, username,  email
                  FROM client, hs_account
                  WHERE client.id = hs_account.userID AND email IN
                   (SELECT email FROM
@@ -60,23 +74,24 @@ $sqlStatement = 'SELECT client.id, TRIM(CONCAT(first_name, " ", name)) as name, 
 $rows = $mysql->sqlQueryFetchall($sqlStatement);
 if(empty($rows)) {
     /* Nothing to do */
-    echo "No duplicate emails found";
+    echo "No duplicate emails found\n";
     exit(0);
 }
 
 /**
  * If file exists remove it and create a new one
  */
-if(file_exists(FILENAME_FULL_PATH)) {
-    unlink(FILENAME_FULL_PATH);
+
+if(file_exists($FILENAME_FULL_PATH)) {
+    unlink($FILENAME_FULL_PATH);
 }
 
-if(!$csvFile = fopen(FILENAME_FULL_PATH, 'w')) {
-    echo "Cannot open file ".FILENAME_FULL_PATH;
+if(!$csvFile = fopen($FILENAME_FULL_PATH, 'w')) {
+    echo "Cannot open file ".$FILENAME_FULL_PATH . "\n";
     exit(1);
 }
 header( 'Content-Type: text/csv' );
-header( 'Content-Disposition: attachment;filename=' . FILENAME);
+header( 'Content-Disposition: attachment;filename=' . $FILENAME);
 
 fputcsv($csvFile, array('Customer ID', 'Name', 'Level', 'Company', 'Username', 'Email'));
 $count_emails  = 0;
@@ -86,10 +101,10 @@ foreach ($rows as $row) {
 }
 
 if(!fclose($csvFile)) {
-    echo "Cannot close file ".FILENAME_FULL_PATH;
+    echo "Cannot close file ". $FILENAME_FULL_PATH;
     exit(2);
 }
 
-echo "Found $count_emails duplicate emails. A csv file with complete information was saved at " . FILENAME_FULL_PATH;
+echo "Found $count_emails duplicate emails. A csv file with complete information was saved at " . $FILENAME_FULL_PATH . "\n";
 exit(0);
 
