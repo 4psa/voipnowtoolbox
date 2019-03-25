@@ -44,7 +44,7 @@ for(my $i=0; $i<@ARGV; $i++) {
     }
 }
 
-$options->{'-p'} ? $policy=$options->{'-p'}:($policy="reject");
+$options->{'-p'} ? $policy=lc($options->{'-p'}):($policy="reject");
 &_params;
 
 foreach my $country (@countries) {
@@ -138,6 +138,14 @@ sub _params {
 
     if ($options->{'-r'}) {
 	print "Refresh IP addresses for the loaded sets: \n";
+    }
+    
+    if ($options->{'-c'}) {
+       my @chars = split(',',lc($options->{'-c'}));
+       foreach my $c (@chars) {
+           if ($c eq 'uk') { $c = 'gb';};
+           push @countries, uc($c);
+       }
     }
 }
 
