@@ -7,7 +7,8 @@
 use strict;
 use LWP::UserAgent;
 use Locale::SubCountry;
-use Cwd;
+use Cwd qw(abs_path);
+use File::Basename qw( dirname );
 $| = 1;
 
 my $url = "http://www.ipdeny.com/ipblocks/data/countries/";
@@ -19,7 +20,7 @@ my $world = Locale::SubCountry::World->new();
 my %all_country_keyed_by_code   = $world->code_full_name_hash;
 
 my ($switch,$options,$j,$param,$policy);
-my $wpath = cwd();
+my $wpath = dirname(abs_path($0));;
 
 #configure countries you want to block
 my @countries = (
@@ -27,6 +28,15 @@ my @countries = (
         "SA",
         "TR",
         );
+
+if (-e "$wpath/.alsoadd") {
+    my $ac = `cat $wpath/.alsoadd`;
+    my @chars = split(',',lc($ac));
+    foreach my $c (@chars) {
+       if ($c eq 'uk') { $c = 'gb';};
+       push @countries, uc($c);
+    }
+}
 
 for(my $i=0; $i<@ARGV; $i++) {
     if(substr($ARGV[$i], 0, 1) eq '-') {
@@ -118,6 +128,7 @@ sub _params {
 	if( /^[Yy](?:es)?$/ ) {
 	    print "Flushing now";
 	    system("/usr/sbin/iptables -F && /usr/sbin/iptables -X && /usr/sbin/ipset destroy");
+	    unlink "$wpath/.alsoadd" or warn "Could not unlink  $!";
 	    print "....done\n";
 	    exit;
 	}  else {
@@ -141,11 +152,14 @@ sub _params {
     }
     
     if ($options->{'-c'}) {
-       my @chars = split(',',lc($options->{'-c'}));
-       foreach my $c (@chars) {
+	open(my $fh, '>', $wpath."/.alsoadd") or die "Could not open file  $!";
+	print $fh $options->{'-c'};
+	close($fh);
+        my @chars = split(',',lc($options->{'-c'}));
+        foreach my $c (@chars) {
            if ($c eq 'uk') { $c = 'gb';};
            push @countries, uc($c);
-       }
+        }
     }
 }
 
