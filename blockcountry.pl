@@ -9,6 +9,7 @@ use LWP::UserAgent;
 use Locale::SubCountry;
 use Cwd qw(abs_path);
 use File::Basename qw( dirname );
+
 $| = 1;
 
 my $url = "http://www.ipdeny.com/ipblocks/data/countries/";
@@ -20,13 +21,19 @@ my $world = Locale::SubCountry::World->new();
 my %all_country_keyed_by_code   = $world->code_full_name_hash;
 
 my ($switch,$options,$j,$param,$policy);
-my $wpath = dirname(abs_path($0));;
+my $wpath = dirname(abs_path($0));
 
 #configure countries you want to block
 my @countries = (
         "PS",
         "SA",
         "TR",
+	"CI",
+	"BL",
+	"KP",
+	"AX",
+	"RE",
+	"CW",
         );
 
 if (-e "$wpath/.alsoadd") {
@@ -59,10 +66,19 @@ $options->{'-p'} ? $policy=lc($options->{'-p'}):($policy="reject");
 
 foreach my $country (@countries) {
     my $country_name = $all_country_keyed_by_code{$country};
+#    if 
     $country_name =~ s/\,//g;
+    $country_name =~ s/\'/_/g;
+    $country_name =~ s/\x{0F4}/o/g;
+    $country_name =~ s/\x{0E7}/c/g;
+    $country_name =~ s/\x{0E9}/e/g;
+    $country_name =~ s/\x{0C5}/A/g;
     $country_name =~ s/\)/_/g;
     $country_name =~ s/\(/_/g;
     $country_name =~ s/\ /_/g;
+    $country_name = substr($country_name,0,30);
+
+
     open(my $fh, '>', $wpath."/".$country_name.".conf") or die "Could not open file  $!";
     print $fh "create $country_name hash:net family inet hashsize 2048 maxelem 65536 \n";
     my $response = $ua->get($url."/".lc($country).".zone");
@@ -71,7 +87,7 @@ foreach my $country (@countries) {
         if ($options->{'-r'}) {
 	    print " $all_country_keyed_by_code{$country} ";
 	} else {
-	    print "Write set files and enable rules for $all_country_keyed_by_code{$country} ";
+	    print "Write set files and enable rules for $country_name ";
 	}
     	foreach my $line( @lines ) {
 	    print $fh "add $country_name $line \n";
