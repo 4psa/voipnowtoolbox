@@ -12,6 +12,13 @@ use File::Basename qw( dirname );
 
 $| = 1;
 
+#configure countries you want to block
+my @countries = (
+        "PS",
+        "SA",
+        "TR",
+        );
+
 my $url = "http://www.ipdeny.com/ipblocks/data/countries/";
 my $ua = LWP::UserAgent->new;
     $ua->timeout(10);
@@ -20,8 +27,11 @@ my $ua = LWP::UserAgent->new;
 my $world = Locale::SubCountry::World->new();
 my %all_country_keyed_by_code   = $world->code_full_name_hash;
 
-my ($switch,$options,$j,$param,$policy,$iptables,$ipset,$grep,$awk,$cat);
+my ($switch,$options,$j,$param,$policy,$iptables,$ipset,$grep,$awk,$cat,$bigset);
 my $wpath = dirname(abs_path($0));
+
+#group all coutries to one set if there are more than 25 countries added
+if (scalar @countries > 25) { $bigset = 1 }
 
 open(my $rh, '<', "/etc/redhat-release") or die "Could not open file  $!";
 while (my $row = <$rh>) {
@@ -42,12 +52,6 @@ while (my $row = <$rh>) {
     }
 }
 
-#configure countries you want to block
-my @countries = (
-        "PS",
-        "SA",
-        "TR",
-        );
 
 if (-e "$wpath/.alsoadd") {
     my $ac = `$cat $wpath/.alsoadd`;
@@ -77,38 +81,61 @@ for(my $i=0; $i<@ARGV; $i++) {
 $options->{'-p'} ? $policy=lc($options->{'-p'}):($policy="reject");
 &_params;
 
-
-foreach my $country (@countries) {
-    my $country_name = $all_country_keyed_by_code{$country};
-    $country_name =~ s/\,//g;
-    $country_name =~ s/\'/_/g;
-    $country_name =~ s/\x{0F4}/o/g;
-    $country_name =~ s/\x{0E7}/c/g;
-    $country_name =~ s/\x{0E9}/e/g;
-    $country_name =~ s/\x{0C5}/A/g;
-    $country_name =~ s/\)/_/g;
-    $country_name =~ s/\(/_/g;
-    $country_name =~ s/\ /_/g;
-    $country_name = substr($country_name,0,30);
-
+unless ($bigset) {
+    foreach my $country (@countries) {
+	my $country_name = $all_country_keyed_by_code{$country};
+	$country_name =~ s/\,//g;
+	$country_name =~ s/\'/_/g;
+	$country_name =~ s/\x{0F4}/o/g;
+	$country_name =~ s/\x{0E7}/c/g;
+	$country_name =~ s/\x{0E9}/e/g;
+	$country_name =~ s/\x{0C5}/A/g;
+	$country_name =~ s/\)/_/g;
+	$country_name =~ s/\(/_/g;
+	$country_name =~ s/\ /_/g;
+	$country_name = substr($country_name,0,30);
+	open(my $fh, '>', $wpath."/".$country_name.".conf") or die "Could not open file  $!";
+	print $fh "create $country_name hash:net family inet hashsize 2048 maxelem 65536 \n";
+	my $response = $ua->get($url."/".lc($country).".zone");
+	if ($response->is_success) {
+    	    my @lines = split /\n/, $response->decoded_content;
+    	    if ($options->{'-r'}) {
+		print " $country_name ";
+	    } else {
+		print "Write set files and enable rules for $country_name ";
+	    }
+    	    foreach my $line( @lines ) {
+		print $fh "add $country_name $line \n";
+	    }
+	    close($fh);
+    	    &_enable_rules($country_name);
+	} else {
+    	    die $response->status_line;
+	}
+    }
+} else {
+    my $country_name = scalar @countries."-coutries-set";
     open(my $fh, '>', $wpath."/".$country_name.".conf") or die "Could not open file  $!";
     print $fh "create $country_name hash:net family inet hashsize 2048 maxelem 65536 \n";
-    my $response = $ua->get($url."/".lc($country).".zone");
-    if ($response->is_success) {
-        my @lines = split /\n/, $response->decoded_content;
-        if ($options->{'-r'}) {
-	    print " $country_name ";
+    print "Write set file for all countries in one big set file: $country_name \n";
+    foreach my $country (@countries) {
+	my $response = $ua->get($url."/".lc($country).".zone");
+	if ($response->is_success) {
+    	    my @lines = split /\n/, $response->decoded_content;
+    	    if ($options->{'-r'}) {
+		print "$country_name ";
+	    } else {
+		print "Add rules for $all_country_keyed_by_code{$country} to $country_name\n ";
+	    }
+    	    foreach my $line( @lines ) {
+		print $fh "add $country_name $line \n";
+	    }
 	} else {
-	    print "Write set files and enable rules for $country_name ";
+    	    die $response->status_line;
 	}
-    	foreach my $line( @lines ) {
-	    print $fh "add $country_name $line \n";
-	}
-	close($fh);
-    	&_enable_rules($country_name);
-    } else {
-    	die $response->status_line;
     }
+    close($fh);
+    &_enable_rules($country_name);
 }
 
 sub _enable_rules {
@@ -119,7 +146,7 @@ sub _enable_rules {
     } else {
         system ($ipset." restore -! < $wpath/" .trim($set).".conf");   
 	my $cip = `$iptables -nL | $grep "$set" | $awk '{print $4}'`;
-	if ($cip) {
+	if ($cip){
 	    if ($policy eq 'reject') {
 		system($iptables." -D INPUT -m set --match-set ". trim($set). " src -j REJECT --reject-with icmp-host-unreachable");
 	    } elsif ($policy eq 'accept') {
@@ -150,20 +177,41 @@ sub _params {
 	exit;
     }
 
-
-
     if ($options->{'-f'}) {
 	print 'Flush all the IP sets and iptables rules? [Y/N]';
 	chomp ($_=<STDIN>);
 	if( /^[Yy](?:es)?$/ ) {
 	    print "Flushing now";
 	    system($iptables." -F && ".$iptables." -X && ".$ipset." destroy");
-	    unlink "$wpath/.alsoadd" or warn "Could not unlink  $!";
+	    if ( -e "$wpath/.alsoadd") {
+		unlink "$wpath/.alsoadd" or warn "Could not unlink  $!";
+	    }
 	    print "....done\n";
 	    exit;
 	}  else {
     	    print "Exiting without flushing the existing rules\n";
 	    exit;
+	}
+    }
+
+    if ($options->{'-d'}) {
+        my @ln = `$iptables -vnL --line-number | $grep set`;
+        if (@ln){
+	    print 'Delete all iptables rules for the current IP sets? [Y/N]';
+	    chomp ($_=<STDIN>);
+	    if( /^[Yy](?:es)?$/ ) {
+		print "Removing iptables rules \n";
+		foreach my $l (reverse @ln) {
+		    my @lnum=split(' ',$l);
+		    print "Rule for $lnum[11] - deleted \n";
+		    system($iptables." -D INPUT $lnum[0]");
+	        }
+		print "....done\n";
+		exit;
+	    } 
+	} else {
+    	    print "No rule to remove\n";
+	    exit;	
 	}
     }
 
